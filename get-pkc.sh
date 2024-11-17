@@ -18,8 +18,8 @@ echo "Step 1: Sending request to RA server to generate a PKC..."
 response=$(curl -s -X POST http://localhost:5000/ra/request_certificate \
     -H "Content-Type: application/json" \
     -d '{
-          "public_key": "user_public_key_1234",
-          "identifier": "user@example.com"
+          "public_key": "12345",
+          "identifier": "rakshit@example.com"
         }')
 
 # Display the response from RA
