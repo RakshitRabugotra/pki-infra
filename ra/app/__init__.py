@@ -13,6 +13,7 @@ pending_requests = []  # Store requests for certificate verification
 
 @app.route('/')
 def home():
+    global pending_requests
     return render_template('index.html', requests=pending_requests)
 
 @app.route('/ra/request_certificate', methods=['POST'])
@@ -39,12 +40,16 @@ def request_certificate():
     }
     pending_requests.append(request_data)
 
+    # Delete all the resources, like the file-contents of this id
+    contents = filter(lambda file: file.startswith(identifier), os.listdir(RESOURCE_DIR))
+    for content in contents:
+        os.remove(os.path.join(RESOURCE_DIR, content))
+
     return jsonify({"status": "request_queued", "message": "Request has been queued for examination"}), 200
 
 @app.route("/ra/forward_request/<string:request_id>", methods=['GET'])
 def forward_request(request_id: str):
 
-    print("pending requeets: ", pending_requests)
     # Check if the id is valid and exists in pending requests
     request_matches = list(filter(lambda request: request['request_id'] == request_id, pending_requests))
     request_data = None
@@ -60,6 +65,8 @@ def forward_request(request_id: str):
     response = requests.post(ca_url, json=request_data)
     
     if response.status_code == 200:
+        # Remove the request from the list
+        pending_requests = list(filter(lambda request: request['request_id'] != request_id, pending_requests))
         return jsonify({"status": "request_sent", "message": "Request sent to CA."}), 200
     else:
         return jsonify({"status": "error", "message": "Failed to forward request to CA."}), 400
