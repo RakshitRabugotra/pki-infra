@@ -1,9 +1,12 @@
 from flask import Flask, request, jsonify, render_template
+import json
 import time
+import os
 
 # Custom modules
 from app.lib.crypt import Certificate, register_certificate, is_revoked, sign, verify
-
+from app.lib.mail import mail_service
+from app.constants import CERTIFICATE_DIR
 
 app = Flask(__name__)
 
@@ -107,27 +110,56 @@ def approve_request(request_id: str):
             issued_by="CA",
             issued_at=time.time(),
             certificate_id=f"{certificate.identifier}-{int(time.time())}",
-            sign=sign(certificate.public_key.encode('ascii')),
+            sign=sign(certificate.public_key.encode("ascii")),
         )
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
-    
+
     # Save the certificate
     register_certificate(certificate)
-    # Remove the certificate from the queue
-    certificate_requests = list(filter(lambda cert: cert.request_id != certificate.request_id, certificate_requests))
+    
+    # Create the certificate json and send the mail to the user
+    file_path = os.path.join(CERTIFICATE_DIR, certificate.identifier + '.json')
+    with open(file_path, mode="w+") as wFile:
+        json.dump(certificate.to_dict(), wFile)
+    
+    # Create the certificate .pem file and attach it to the mail
+    pem_file_path = os.path.join(CERTIFICATE_DIR, certificate.identifier.replace('.', '-') + '.pem')
+    with open(pem_file_path, mode='w+') as wFile:
+        wFile.write(certificate.public_key)
 
-    # Return the certificate (simulate sending to the end-user via RA)
-    return (
-        jsonify(
-            {
-                "certificate": certificate.to_dict(),
-                "status": "generated",
-                "message": "Certificate issued successfully.",
-            }
-        ),
-        200,
-    )
+    try:
+        # assuming that the identity is their email address
+        mail_service.send_mail(
+            "Public-Key Certificate", certificate.identifier, files=[file_path, pem_file_path]
+        )
+
+        # Remove the certificate from the queue
+        certificate_requests = list(
+            filter(
+                lambda cert: cert.request_id != certificate.request_id, certificate_requests
+            )
+        )
+
+        # Return the certificate (simulate sending to the end-user via RA)
+        return (
+            jsonify(
+                {
+                    "certificate": certificate.to_dict(),
+                    "status": "generated",
+                    "message": "Certificate issued successfully.",
+                }
+            ),
+            200,
+        )
+
+    except Exception as e:
+        return (
+            jsonify(
+                {"status": "error", "message": "Error while sending the certificate " + str(e)}
+            ),
+            500,
+        )
 
 
 @app.route("/ca/verify_certificate", methods=["POST"])

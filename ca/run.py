@@ -1,3 +1,7 @@
+from dotenv import load_dotenv
+# Load the env Variables
+load_dotenv()
+
 from app import app
 
 """
