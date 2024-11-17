@@ -14,10 +14,13 @@ pending_requests = []  # Store requests for certificate verification
 @app.route('/')
 def home():
     global pending_requests
+    print("pending-requests: ", pending_requests)
     return render_template('index.html', requests=pending_requests)
 
 @app.route('/ra/request_certificate', methods=['POST'])
 def request_certificate():
+    global pending_requests
+
     public_key_file = request.files['public-key']
     identifier = request.form['identifier']
 
@@ -49,7 +52,7 @@ def request_certificate():
 
 @app.route("/ra/forward_request/<string:request_id>", methods=['GET'])
 def forward_request(request_id: str):
-
+    global pending_requests
     # Check if the id is valid and exists in pending requests
     request_matches = list(filter(lambda request: request['request_id'] == request_id, pending_requests))
     request_data = None
