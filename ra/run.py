@@ -8,7 +8,7 @@ pending_requests = []  # Store requests for certificate verification
 
 @app.route('/')
 def home():
-    return render_template('ra.html', requests=pending_requests)
+    return render_template('index.html', requests=pending_requests)
 
 @app.route('/ra/request_certificate', methods=['POST'])
 def request_certificate():

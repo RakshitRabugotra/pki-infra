@@ -19,7 +19,7 @@ certificate_requests = [
 
 @app.route('/')
 def home():
-    return render_template('ca.html', requests=certificate_requests)
+    return render_template('index.html', requests=certificate_requests)
 
 @app.route('/ca/approve_request/<int:req_id>', methods=['POST'])
 def approve_request(req_id):
