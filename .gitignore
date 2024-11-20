@@ -1,7 +1,11 @@
 # custom ignores
 res/
 instance/
+migrations/
 todo.txt
+
+# ignore all the keys
+*.pem
 
 .DS_Store
 .env
