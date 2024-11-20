@@ -8,6 +8,7 @@ from app.lib.util import timestamp, get_id
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
+REQUEST_LIMIT = 5
 # Simulated database for storing requests
 pending_requests = []  # Store requests for certificate verification
 
@@ -20,6 +21,18 @@ def home():
 @app.route('/ra/request_certificate', methods=['POST'])
 def request_certificate():
     global pending_requests
+
+    # If the request queue is full, then return busy status
+    if len(pending_requests) >= REQUEST_LIMIT:
+        return (
+            jsonify(
+                {
+                    "status": "request queue full",
+                    "message": "The server is busy, try again later",
+                }
+            ),
+            503,
+        )
 
     public_key_file = request.files['public-key']
     identifier = request.form['identifier']
@@ -75,12 +88,12 @@ def forward_request(request_id: str):
         return jsonify({"status": "error", "message": "Failed to forward request to CA."}), 400
 
 
-@app.route('/ra/verify_certificate', methods=['POST'])
-def verify_certificate():
-    public_key = request.form['file']
-    sign = request.form['sign']
-    # Send the verification request to CA
-    ca_url = 'http://localhost:5001/ca/verify_certificate'
-    response = requests.post(ca_url, json={"public_key": public_key, 'sign': sign})
+# @app.route('/ra/verify_certificate', methods=['POST'])
+# def verify_certificate():
+#     public_key = request.form['file']
+#     sign = request.form['sign']
+#     # Send the verification request to CA
+#     ca_url = 'http://localhost:5001/ca/verify_certificate'
+#     response = requests.post(ca_url, json={"public_key": public_key, 'sign': sign})
     
-    return jsonify(response.json()), response.status_code
+#     return jsonify(response.json()), response.status_code
