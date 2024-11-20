@@ -45,14 +45,16 @@ def decrypt(message: str, private_key: rsa.PrivateKey):
     return rsa.decrypt(message.encode('ascii'), private_key)
 
 
-def sign(message: bytes, private_key: bytes=None, hash_method: str=SIGN_METHOD):
+def sign(message: bytes, private_key: bytes=None, hash_method:str=SIGN_METHOD):
     # Get the private key of the server
     private_key = private_key or __load_private_key()
     return rsa.sign(message, private_key, hash_method)
 
 
-def verify(message: str, signature: bytes, public_key: bytes):
-    return rsa.verify(message.encode('ascii'), signature, rsa.PublicKey.load_pkcs1(public_key))
+def verify(message: bytes, signature: bytes, public_key: bytes=None):
+    # Get the public key of the server
+    public_key = public_key or load_public_key()
+    return rsa.verify(message, signature, public_key)
 
 def register_certificate(certificate: Certificate):
     with open(RECORD_FILE, mode='a+') as file:

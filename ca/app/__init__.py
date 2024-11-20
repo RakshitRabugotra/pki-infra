@@ -6,6 +6,7 @@ import os
 # Custom modules
 from app.lib.crypt import Certificate, register_certificate, is_revoked, sign, verify
 from app.lib.mail import mail_service
+from app.lib.util import timestamp
 from app.constants import CERTIFICATE_DIR
 
 app = Flask(__name__)
@@ -110,7 +111,7 @@ def approve_request(request_id: str):
             issued_by="CA",
             issued_at=time.time(),
             certificate_id=f"{certificate.identifier}-{int(time.time())}",
-            sign=sign(certificate.public_key.encode("ascii")),
+            sign=sign(certificate.public_key.encode()),
         )
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -131,7 +132,7 @@ def approve_request(request_id: str):
     try:
         # assuming that the identity is their email address
         mail_service.send_mail(
-            "Public-Key Certificate", certificate.identifier, files=[file_path, pem_file_path]
+            "Public-Key Certificate", certificate.identifier, file_paths=[file_path, pem_file_path]
         )
 
         # Remove the certificate from the queue
@@ -164,23 +165,34 @@ def approve_request(request_id: str):
 
 @app.route("/ca/verify_certificate", methods=["POST"])
 def verify_certificate():
-    data = request.get_json()
-    public_key = data["public_key"]
-    sign = data["sign"]
+    public_key_file: bytes = request.files["public-key"]
+    sign: str = request.form["sign"]
+
+    # Save the file to the resource, TODO: can be optimized
+    filename = os.path.join(CERTIFICATE_DIR, timestamp())
+    public_key_file.save(filename)
+    public_key = ""
+    with open(filename, mode='r') as key_file:
+        public_key = key_file.read()
+    # Delete the file
+    os.remove(filename)
 
     # Verify if certificate exists
-    is_valid = verify(public_key, sign, public_key)
-    if is_valid:
-        # Simulate checking if the certificate is in the CRL (revoked)
-        if not is_revoked(public_key):
-            return (
-                jsonify({"status": "invalid", "message": "Certificate is revoked."}),
-                400,
-            )
+    try:
+        is_valid = verify(public_key.encode(), bytes.fromhex(sign))
 
-        return jsonify({"status": "valid"}), 200
-    else:
-        return jsonify({"status": "invalid", "message": "Certificate not found."}), 400
+        if is_valid:
+            # # Simulate checking if the certificate is in the CRL (revoked)
+            # if not is_revoked(public_key):
+            #     return (
+            #         jsonify({"status": "invalid", "message": "Certificate is revoked."}),
+            #         400,
+            #     )
+            return jsonify({"status": "valid"}), 200
+        else:
+            return jsonify({"status": "invalid", "message": "Certificate not found."}), 400
+    except Exception as e:
+        return jsonify({"status": "invalid", "message": "Certificate is invalid: " + str(e)}), 400
 
 
 @app.route("/ca/revoke_certificate/<certificate_id>", methods=["POST"])
